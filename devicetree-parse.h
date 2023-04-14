@@ -19,6 +19,7 @@ typedef void (^devicetree_iterate_property_callback_t)(
 		unsigned depth,
 		const char *name,
 		const void *value, size_t size,
+		uint32_t flags,
 		bool *stop);
 
 bool devicetree_iterate(const void **data, size_t size,

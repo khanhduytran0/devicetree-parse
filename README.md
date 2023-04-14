@@ -1,6 +1,6 @@
 # devicetree-parse
 
-This is a small utility to parse Apple's binary device tree format.
+This is a small utility to parse Apple's binary device tree format to json with `devicetree-parse` and vice versa with `devicetree-repack`.
 
 ## Usage
 

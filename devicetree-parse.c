@@ -5,6 +5,7 @@
 #include "devicetree-parse.h"
 
 #include <assert.h>
+#include <stdio.h>
 
 struct devicetree_node {
 	uint32_t n_properties;
@@ -13,7 +14,8 @@ struct devicetree_node {
 
 struct devicetree_property {
 	char name[32];
-	uint32_t size;
+	uint16_t size;
+	uint16_t flags;
 	uint8_t data[0];
 };
 
@@ -57,7 +59,7 @@ devicetree_iterate_node(const void **data, const void *data_end,
 		// field (bit 31) which is set if iBoot should replace the value of the field with
 		// a syscfg property or other value. (We do not see this flag for device trees
 		// dumped from kernel memory.)
-		uint32_t prop_size = prop->size & ~0x80000000;
+		uint32_t prop_size = prop->size;
 		size_t padded_size = (prop_size + 0x3) & ~0x3;
 		p += padded_size;
 		if (p > end) {
@@ -70,7 +72,7 @@ devicetree_iterate_node(const void **data, const void *data_end,
 		}
 		// If we have a property callback, invoke it.
 		if (property_callback != NULL) {
-			property_callback(depth + 1, prop->name, prop->data, prop_size, stop);
+			property_callback(depth + 1, prop->name, prop->data, prop_size, prop->flags, stop);
 			if (*stop) {
 				return true;
 			}
@@ -88,6 +90,9 @@ devicetree_iterate_node(const void **data, const void *data_end,
 		if (*stop) {
 			return true;
 		}
+	}
+	if (node_callback != NULL) {
+		node_callback(depth, NULL, 0, 0, 0, NULL);
 	}
 	return true;
 }

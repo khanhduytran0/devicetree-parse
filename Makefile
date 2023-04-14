@@ -11,7 +11,7 @@ endif
 CLANG    := $(shell xcrun --sdk $(SDK) --find clang)
 CC       := $(CLANG) -isysroot $(SYSROOT) -arch $(ARCH)
 
-CFLAGS  = -O2 -Wall -Werror
+CFLAGS  = -O2 -Wall -fobjc-arc
 LDFLAGS =
 
 ifneq ($(DEBUG),0)
@@ -20,15 +20,25 @@ endif
 
 FRAMEWORKS =
 
-SOURCES = devicetree-parse.c \
-	  main.c
+all: devicetree-parse devicetree-repack
 
-HEADERS = devicetree-parse.h
+devicetree-parse: devicetree-parse.o parse.o repack.o
+	$(CC) $(CFLAGS) $(FRAMEWORKS) $(DEFINES) $(LDFLAGS) -o $@ devicetree-parse.o parse.c
 
-all: $(TARGET)
+devicetree-repack: repack.o
+	$(CC) $(CFLAGS) $(FRAMEWORKS) $(DEFINES) $(LDFLAGS) -o $@ repack.m
 
-$(TARGET): $(SOURCES) $(HEADERS)
-	$(CC) $(CFLAGS) $(FRAMEWORKS) $(DEFINES) $(LDFLAGS) -o $@ $(SOURCES)
+devicetree-parse.o: devicetree-parse.c $(HEADERS)
+	$(CC) $(CFLAGS) $(FRAMEWORKS) $(DEFINES) $(LDFLAGS) -c -o $@ devicetree-parse.c
+
+parse.o: parse.c $(HEADERS)
+	$(CC) $(CFLAGS) $(FRAMEWORKS) $(DEFINES) $(LDFLAGS) -c -o $@ parse.c
+
+repack.o: repack.m $(HEADERS)
+	$(CC) $(CFLAGS) $(FRAMEWORKS) $(DEFINES) $(LDFLAGS) -c -o $@ repack.m
+
+main.o: main.c $(HEADERS)
+	$(CC) $(CFLAGS) $(FRAMEWORKS) $(DEFINES) $(LDFLAGS) -c -o $@ main.c
 
 clean:
-	rm -f -- $(TARGET)
+	rm -f -- *.o devicetree-parse devicetree-repack

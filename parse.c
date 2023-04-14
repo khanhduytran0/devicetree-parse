@@ -307,11 +307,11 @@ print_property_hex_string(struct strbuf *sb, const void *data, size_t size) {
 			ok = strbuf_printf(sb, "\\");
 		}
 		if (c == 0) {
-			ok = strbuf_printf(sb, "\\0");
+			ok = strbuf_printf(sb, "\\\\x00");
 		} else if (isprint(c)) {
 			ok = strbuf_printf(sb, "%c", c);
 		} else {
-			ok = strbuf_printf(sb, "\\x%02x", (unsigned)c);
+			ok = strbuf_printf(sb, "\\\\x%02x", (unsigned)c);
 		}
 	}
 	if (ok) {
@@ -368,6 +368,8 @@ print_property_segment_ranges(struct strbuf *sb, const void *data, size_t size) 
 static bool
 print_property(struct strbuf *sb, const char *name, const void *value, size_t size) {
 	enum display_type disp = compute_display_type(name, value, size);
+        printf(", \"disp\": %d, \"value\": ", disp);
+/*
 	switch (disp) {
 		default: // DISP_HEX_DUMP
 			return print_property_hex_dump(sb, value, size);
@@ -386,6 +388,27 @@ print_property(struct strbuf *sb, const char *name, const void *value, size_t si
 		case DISP_SEGMENT_RANGES:
 			return print_property_segment_ranges(sb, value, size);
 	}
+*/
+
+	switch (disp) {
+		case DISP_HEX_INT:
+		case DISP_DEC_INT:
+			return print_property_dec_int(sb, value, size);
+		case DISP_STRING:
+			return print_property_string(sb, value, size);
+		default:
+		case DISP_HEX_DUMP:
+		case DISP_HEX_STRING:
+		case DISP_PHYS_RANGES:
+		case DISP_SEGMENT_RANGES:
+			return print_property_hex_string(sb, value, size);
+		case DISP_FUNCTION_PROP:
+			return print_property_function(sb, value, size);
+		//case DISP_PHYS_RANGES: // TODO?
+			//return print_property_phys_ranges(sb, value, size);
+		//case DISP_SEGMENT_RANGES: // TODO?
+			//return print_property_segment_ranges(sb, value, size);
+	}
 }
 
 static void
@@ -393,9 +416,9 @@ print_indent(unsigned depth) {
 	if (print_tree) {
 		if (depth > 0) {
 			for (unsigned i = 0; i < depth - 1; i++) {
-				printf("|   ");
+				printf("    ");
 			}
-			printf("|-- ");
+			printf("     ");
 		}
 	} else {
 		for (unsigned i = 0; i < 4 * depth; i++) {
@@ -411,7 +434,7 @@ devicetree_print(const void *data, size_t size) {
 	strbuf_alloc(&sb, print_verbose ? -1 : 64);
 	devicetree_iterate_property_callback_t find_node_name_cb =
 			^(unsigned depth, const char *name,
-					const void *value, size_t size, bool *stop) {
+					const void *value, size_t size, uint32_t flags, bool *stop) {
 		if (strcmp(name, "name") == 0) {
 			node_name = (const char *)value;
 		}
@@ -419,27 +442,38 @@ devicetree_print(const void *data, size_t size) {
 	devicetree_iterate_node_callback_t node_cb =
 			^(unsigned depth, const void *node, size_t size,
 					unsigned n_properties, unsigned n_children, bool *stop) {
+		if (stop == NULL) {
+			print_indent(depth);
+			printf("],\n");
+			return;
+		}
+
 		bool ok = devicetree_node_scan_properties(node, size, find_node_name_cb);
 		if (!ok) {
 			node_name = "NODE";
 		}
 		print_indent(depth);
-		printf("%s:\n", node_name);
+		if (depth == 0) {
+			printf("\"%s\": ", node_name);
+		}
+		printf("[\n");
 	};
 	devicetree_iterate_property_callback_t property_cb =
 			^(unsigned depth, const char *name,
-					const void *value, size_t size, bool *stop) {
+					const void *value, size_t size, uint32_t flags, bool *stop) {
 		print_indent(depth);
-		printf("%s (%zu)%s", name, size, (size > 0 ? ": " : ""));
+		printf("{\"name\": \"%s\", \"length\": %zu, \"flags\": %u", name, size, flags);
 		if (size > 0) {
 			sb.pos = 0;
 			bool complete = print_property(&sb, name, value, size);
 			printf("%s%s", sb.str, complete ? "" : "...");
 		}
-		printf("\n");
+		printf(" },\n");
 	};
 	const void *processed = data;
+        printf("{");
 	bool ok = devicetree_iterate(&processed, size, node_cb, property_cb);
+        printf("}");
 	strbuf_free(&sb);
 	return (ok && (processed == (uint8_t *)data + size));
 }
@@ -477,8 +511,13 @@ fail_0:
 
 int
 main(int argc, const char *argv[]) {
+	// tmp: default to true
+	print_verbose = true;
+	print_tree = true;
+
 	// Parse options.
 	int argidx = 1;
+/*
 	while (argidx < argc) {
 		const char *arg = argv[argidx];
 		argidx++;
@@ -491,9 +530,11 @@ main(int argc, const char *argv[]) {
 			break;
 		}
 	}
+*/
 	// Parse arguments.
 	if (argidx != argc - 1) {
-		printf("usage: %s [-v] [-t] <devicetree-file>\n", getprogname());
+		//printf("usage: %s [-v] [-t] <devicetree-file>\n", getprogname());
+		printf("usage: %s <devicetree-file>\n", getprogname());
 		return 1;
 	}
 	const char *file = argv[argidx];
